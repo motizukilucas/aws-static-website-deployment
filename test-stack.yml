@@ -34,89 +34,6 @@ Parameters:
     Type: String
 
 Resources:
-  S3BucketForWebsiteContent:
-    Type: AWS::S3::Bucket
-    Properties:
-      AccessControl: PublicRead
-      WebsiteConfiguration:
-        IndexDocument: !Ref WebsiteHome
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
-  S3BucketForWebsiteContentAllowReadPolicy:
-    Type: AWS::S3::BucketPolicy 
-    Properties:
-      Bucket: !Ref S3BucketForWebsiteContent
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Action:
-              - 's3:GetObject'
-            Effect: Allow
-            Resource: !Join
-              - ''
-              - - 'arn:aws:s3:::'
-                - !Ref S3BucketForWebsiteContent
-                - /*
-            Principal: '*'
-
-  WebsiteCDN:
-    Type: AWS::CloudFront::Distribution
-    DependsOn: S3BucketForWebsiteContent
-    Properties:
-      DistributionConfig:
-        Comment: CDN for S3-backed website
-        Enabled: 'true'
-        DefaultCacheBehavior:
-          ForwardedValues:
-            QueryString: 'true'
-          TargetOriginId: !Ref S3BucketForWebsiteContent
-          ViewerProtocolPolicy: allow-all
-        DefaultRootObject: !Ref WebsiteHome
-        Origins:
-        - CustomOriginConfig:
-            HTTPPort: '80'
-            HTTPSPort: '443'
-            # OriginProtocolPolicy: match-viewer 
-            # OriginProtocolPolicy: https-only 
-            OriginProtocolPolicy: http-only 
-          DomainName:
-            Fn::Join:
-            - ''
-            - - Ref: S3BucketForWebsiteContent
-              - ".s3-website-us-east-1.amazonaws.com"
-          Id: !Ref S3BucketForWebsiteContent
-
-  WebsiteDNSName:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneName:
-        Fn::Join:
-        - ''
-        - - Ref: HostedZone
-          - "."
-      Comment: CNAME redirect custom name to CloudFront distribution
-      Name:
-        Fn::Join:
-        - ''
-        - - Ref: AWS::StackName
-          - Ref: AWS::AccountId
-          - "."
-          - Ref: AWS::Region
-          - "."
-          - Ref: HostedZone
-      Type: CNAME
-      TTL: '900'
-      ResourceRecords:
-      - Fn::Join:
-        - ''
-        - - http://
-          - Fn::GetAtt:
-            - WebsiteCDN
-            - DomainName
-
   CodePipelineArtifactStoreBucket:
     Type: 'AWS::S3::Bucket'
   CodePipelineArtifactStoreBucketPolicy:
@@ -158,7 +75,7 @@ Resources:
     Properties:
       Authentication: GITHUB_HMAC
       AuthenticationConfiguration:
-        SecretToken: "{{resolve:secretsmanager:motizukilucas/GithubAccessToken:SecretString:AccessToken}}" 
+        SecretToken: "{{resolve:secretsmanager:MyGitHubSecret:SecretString:token}}"
       Filters:
         - JsonPath: $.ref
           MatchEquals: 'refs/heads/{Branch}'
@@ -191,7 +108,7 @@ Resources:
                 Owner: !Ref GitHubOwner
                 Repo: !Ref RepositoryName
                 Branch: !Ref BranchName
-                OAuthToken: "{{resolve:secretsmanager:motizukilucas/GithubAccessToken:SecretString:AccessToken}}"
+                OAuthToken: "{{resolve:secretsmanager:MyGitHubSecret:SecretString:token}}"
                 PollForSourceChanges: true
               RunOrder: 1
         # - Name: Beta
@@ -269,16 +186,3 @@ Resources:
                   # - 'sqs:*'
                   # - 'ecs:*'
                 Resource: '*'
-
-Outputs:
-  WebsiteURL:
-    Value:
-      Fn::Join:
-      - ''
-      - - http://
-        - Ref: WebsiteDNSName
-    Description: The URL of the newly created website
-  BucketName:
-    Value:
-      Ref: S3BucketForWebsiteContent
-    Description: Name of S3 bucket to hold website content
