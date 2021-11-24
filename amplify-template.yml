@@ -1,6 +1,10 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 Parameters:
+  AppName:
+    Type: String
+    Description: Name of the application
+
   Repository:
     Type: String
     Description: GitHub Repository URL
@@ -43,7 +47,7 @@ Resources:
   AmplifyApp:
     Type: "AWS::Amplify::App"
     Properties:
-      Name: MotizukiTI
+      Name: !Ref AppName
       Repository: !Ref Repository
       OauthToken: !Ref OauthToken
       IAMServiceRole: !GetAtt AmplifyRole.Arn
